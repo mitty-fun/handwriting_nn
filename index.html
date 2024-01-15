@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>handwriting recognition</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+  <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
+</head>
+
+<body>
+  <div class="container">
+    <div class="row">
+      <div class="col-9">
+        <div class="overflow-scroll bg-dark" style="height: 160px;">
+          <div class="position-relative">
+            <div id="cursor" class="position-absolute"
+              style="width: 14px; height: 14px; top:0; left: 0; z-index: 10; background-color: rgba(255, 255, 255, 0.7);">
+            </div>
+            <canvas id="mark-canvas" width="28000" height="420" class="position-absolute top-0 left-0"></canvas>
+            <canvas id="data-canvas" width="28000" height="420"></canvas>
+          </div>
+        </div>
+        <div class="input-group">
+          <button id="download" class="btn btn-sm btn-primary">download</button>
+          <input id="upload" type="file" class="form-control">
+        </div>
+      </div>
+      <div class="col-3">
+        <canvas id="draw-canvas" class="border bg-black" width="14" height="14"
+          style="width: 140px; image-rendering: pixelated;"></canvas>
+        <canvas id="mini-canvas" class="border bg-black" width="14" height="14"></canvas>
+        <p id="result"></p>
+        <div class="input-group">
+          <button id="saveback" class="btn btn-sm btn-primary">save back</button>
+          <button id="clear" class="btn btn-sm btn-primary">clear</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="row">
+      <div class="col-9">
+        <canvas id="chart-canvas"></canvas>
+        <canvas id="brain-canvas" width="1200" height="600"></canvas>
+      </div>
+      <div class="col-3">
+        <button id="start" class="btn btn-primary">開始訓練</button>
+        <button id="stop" class="btn btn-primary">結束訓練</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="nn.js"></script>
+  <script src="render.js"></script>
+  <script src="index.js"></script>
+  <script>
+
+    const img = new Image
+    img.src = '/merge_2000_sm.jpg'
+    img.onload = () => dataCtx.drawImage(img, 0, 0)
+
+    $('#start').click(start)
+    $('#stop').click(stop)
+
+    let loopId
+    let trainData
+
+    function start() {
+      trainData = []
+      for (let x = 0; x < 2000; x++) {
+        for (let y = 0; y < 10; y++) {
+          const input = getImageData(x * 14, y * 14, 14, 14)
+          const output = (new Array(10)).fill(0)
+          output[y] = 1
+          trainData.push({ input, output, x, y })
+        }
+      }
+      loop()
+    }
+
+    function stop() {
+      clearTimeout(loopId)
+    }
+
+    function loop() {
+      let passA = 0
+      let passB = 0
+
+      markCtx.clearRect(0, 0, 28000, 420)
+
+      const training = trainData.slice(0, 10000)
+      const testing = trainData.slice(10000, 20000)
+
+      training.forEach((row, index) => {
+        const result = update(row.input)
+        const error = backPropagate(row.output, 0.01)
+        const num = result.indexOf(Math.max(...result))
+        const isPass = row.output[num] === 1
+        if (isPass) passA += 1
+        markCtx.fillStyle = isPass ? 'rgba(0, 255, 0, .5)' : 'rgba(255, 0, 255, .5)'
+        markCtx.fillRect(row.x * 14, row.y * 14, 14, 14)
+      })
+
+      testing.forEach((row, index) => {
+        const result = update(row.input)
+        const error = backPropagate(row.output, 0.01)
+        const num = result.indexOf(Math.max(...result))
+        const isPass = row.output[num] === 1
+        if (isPass) passB += 1
+        markCtx.fillStyle = isPass ? 'rgba(0, 255, 0, .5)' : 'rgba(255, 0, 0, .5)'
+        markCtx.fillRect(row.x * 14, row.y * 14, 14, 14)
+      })
+
+      addLog(passA * 100 / training.length, passB * 100 / testing.length)
+
+      loopId = setTimeout(loop, 1000)
+    }
+  </script>
+</body>
+
+</html>
